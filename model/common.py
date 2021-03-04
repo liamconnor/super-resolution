@@ -3,11 +3,10 @@ import tensorflow as tf
 
 
 DIV2K_RGB_MEAN = np.array([0.4488, 0.4371, 0.4040]) * 255
-
+DIV2K_RGB_MEAN16 = np.array([0.4488, 0.4371, 0.4040]) * 2**16
 
 def resolve_single(model, lr):
     return resolve(model, tf.expand_dims(lr, axis=0))[0]
-
 
 def resolve(model, lr_batch):
     lr_batch = tf.cast(lr_batch, tf.float32)
@@ -17,6 +16,16 @@ def resolve(model, lr_batch):
     sr_batch = tf.cast(sr_batch, tf.uint8)
     return sr_batch
 
+def resolve_single16(model, lr):
+    return resolve16(model, tf.expand_dims(lr, axis=0))[0]
+
+def resolve16(model, lr_batch):
+    lr_batch = tf.cast(lr_batch, tf.float32)
+    sr_batch = model(lr_batch)
+    sr_batch = tf.clip_by_value(sr_batch, 0, 2**16-1)
+    sr_batch = tf.round(sr_batch)
+    sr_batch = tf.cast(sr_batch, tf.uint16)
+    return sr_batch
 
 def evaluate(model, dataset):
     psnr_values = []
@@ -31,10 +40,30 @@ def evaluate(model, dataset):
 #  Normalization
 # ---------------------------------------
 
+def normalize16(data, rgb_mean=DIV2K_RGB_MEAN16):
+#    data = (data - data.min())/2.0**15
+    data *= np.ones([1,1,1])
+    data = data - tf.reduce_min(data)
+    data *= DIV2K_RGB_MEAN16
+    data = data * 2**15
+    return data
+
+#def normalize16(x, rgb_mean=DIV2K_RGB_MEAN16):
+#    print(x)
+#    print((x - rgb_mean) / 2**15)
+#    return (x - rgb_mean) / 2**15
+
+def denormalize16(data, rgb_mean=DIV2K_RGB_MEAN16):
+    tf.print(tf.reduce_max(data))
+    data = data*2**15
+    data += rgb_mean
+    tf.print(tf.reduce_max(data))
+    return data
 
 def normalize(x, rgb_mean=DIV2K_RGB_MEAN):
+#    x = tf.math.subtract(x,tf.reduce_min(x))
+#    printx * 127.5 + rgb_mean, 'norm2')    
     return (x - rgb_mean) / 127.5
-
 
 def denormalize(x, rgb_mean=DIV2K_RGB_MEAN):
     return x * 127.5 + rgb_mean
